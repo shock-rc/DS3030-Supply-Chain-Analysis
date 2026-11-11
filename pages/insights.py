@@ -336,9 +336,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
         st.divider()
 
-
-
-
         st.markdown(
             """
             ### 1. Look beyond total freight cost

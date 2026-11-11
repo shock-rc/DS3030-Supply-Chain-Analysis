@@ -13,6 +13,10 @@ A Streamlit dashboard for the supplied Supply Chain Shipment dataset.
 
 An additional decision-oriented Insights page connects the analyses.
 
+The Streamlit entry point is kept in `app.py`. Each dashboard page is implemented
+in its own renderer under `pages/`, while shared loading and analysis helpers live
+in `data.py`.
+
 ## Run locally
 
 Create/activate a Python environment, then:

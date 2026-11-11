@@ -14,6 +14,31 @@ from data import association_rules
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     st.subheader("Association Rules: What tends to occur together?")
 
+    # Select only numeric columns
+    numeric_data = filtered.select_dtypes(include="number").drop(columns = "id", errors="ignore")
+
+    # Calculate correlation matrix
+    corr_matrix = numeric_data.corr()
+
+    # Plot
+    fig = px.imshow(
+        corr_matrix,
+        text_auto=".2f",
+        aspect="auto",
+        color_continuous_scale="RdBu_r",
+        zmin=-1,
+        zmax=1,
+        title="Correlation Matrix"
+    )
+
+    fig.update_layout(
+        xaxis_title="Variables",
+        yaxis_title="Variables",
+        height=700
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
     s1, s2 = st.columns(2)
     with s1:
         min_support = st.slider("Minimum support", 0.01, 0.15, 0.03, 0.01)
