@@ -46,6 +46,7 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
             "Clustering algorithm",
             ["K-Means", "K-Prototypes"],
             horizontal=True,
+            index=1,
         )
 
         num_cols = st.multiselect(
@@ -57,11 +58,7 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         cat_cols = st.multiselect(
             "Categorical features",
             categorical_features,
-            default=[
-                "shipment mode",
-                "product group",
-                "delivery_status",
-            ],
+            default= categorical_features,
             disabled=(algorithm == "K-Means"),
         )
 

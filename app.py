@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="Supply Chain Financial & Delay Analysis Dashboard",
     page_icon="💲",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 st.title("DS3030 : Supply Chain Financial & Delay Analysis Dashboard")
