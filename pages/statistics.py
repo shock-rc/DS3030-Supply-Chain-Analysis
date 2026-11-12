@@ -1,15 +1,5 @@
-from .common import (
-    chi2_contingency,
-    gaussian_kde,
-    go,
-    json,
-    np,
-    pd,
-    px,
-    st,
-    ttest_ind,
-)
-import numpy as np
+from .common import np, pd, px, st
+
 
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     st.subheader("Statistical Profile & Cost Efficiency")
@@ -53,8 +43,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     for i, c in enumerate(cols):
 
         hist = filtered.dropna(subset=[c])
-        # Same transformation as:
-        # np.log10(df[c].dropna().clip(lower=1))
         hist["log10_value"] = np.log10(hist[c].clip(lower=1))
         fig = px.histogram(
             hist,
@@ -138,7 +126,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
         shipment_counts.columns = ["shipment mode", "count"]
 
-        # Make NaN explicitly visible
         shipment_counts["shipment mode"] = (
             shipment_counts["shipment mode"]
             .fillna("NaN")
@@ -322,10 +309,8 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         .reset_index()
     )
 
-    # Keep only groups with at least 30 rows
     t = t[t["rows"] >= 30].copy()
 
-    # Convert proportion to percentage
     t["percent_late"] *= 100
 
 

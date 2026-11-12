@@ -1,25 +1,13 @@
-from .common import (
-    chi2_contingency,
-    gaussian_kde,
-    go,
-    json,
-    np,
-    pd,
-    px,
-    st,
-    ttest_ind,
-)
+from .common import go, json, np, pd, st
+from data import MANUFACTURING_SITE_FILE
+
 
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
-    import json
-
     st.subheader("Where is it made and where does it go?")
 
-    # --- manufacturing site -> country, from the supplied JSON mapping ---
-    with open("manufacturing_site.json", encoding="utf-8") as f:
+    with MANUFACTURING_SITE_FILE.open(encoding="utf-8") as f:
         SITE_TO_COUNTRY = json.load(f)
 
-    # --- country name -> ISO-3 code for the map ---
     ISO3 = {
         "Afghanistan": "AFG", "Angola": "AGO", "Australia": "AUS", "Belize": "BLZ",
         "Benin": "BEN", "Botswana": "BWA", "Burkina Faso": "BFA", "Burundi": "BDI",
@@ -92,17 +80,11 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     m3.metric("Shipments with unknown origin", f"{unknown_pct:.1f}%")
 
 
-    # ============================================================
-    # SINGLE MAP WITH VIEW TOGGLE
-    # ============================================================
 
     def draw_single_map(view, scale_mfg="Blues", scale_dest="Oranges"):
 
         fig = go.Figure()
 
-        # ========================================================
-        # MANUFACTURING
-        # ========================================================
 
         if view == "Manufacturing":
 
@@ -146,9 +128,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                 )
             )
 
-        # ========================================================
-        # DESTINATION
-        # ========================================================
 
         elif view == "Destination":
 
@@ -192,15 +171,9 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                 )
             )
 
-        # ========================================================
-        # BOTH
-        # ========================================================
 
         else:
 
-            # ----------------------------------------------------
-            # DESTINATION ONLY
-            # ----------------------------------------------------
 
             dest_only = dest[
                 ~dest["country"].isin(mfg["country"])
@@ -252,9 +225,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                     )
                 )
 
-            # ----------------------------------------------------
-            # MANUFACTURING ONLY
-            # ----------------------------------------------------
 
             mfg_only = mfg[
                 ~mfg["country"].isin(dest["country"])
@@ -300,9 +270,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                     )
                 )
 
-            # ----------------------------------------------------
-            # BOTH MANUFACTURING + DESTINATION
-            # ----------------------------------------------------
 
             overlap = (
                 mfg[
@@ -374,9 +341,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                     )
                 )
 
-        # ========================================================
-        # ORIGINAL 2D MAP
-        # ========================================================
 
         fig.update_geos(
             showcountries=True,
@@ -392,9 +356,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         return fig
 
 
-    # ============================================================
-    # DISPLAY ONE MAP
-    # ============================================================
 
     st.plotly_chart(
         draw_single_map(map_view),
@@ -419,7 +380,5 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         )
 
     st.caption(
-        "Manufacturing country is taken from the **manufacturing_site.json** mapping.  \n"
-        "Shipments with no identifiable site ('Not Applicable') are shown as Unknown "
-        "and left off the map."
+        "Manufacturing country is taken from the **manufacturing_site.json** mapping."
     )

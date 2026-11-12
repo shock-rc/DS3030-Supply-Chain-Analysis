@@ -1,20 +1,8 @@
-from .common import (
-    chi2_contingency,
-    gaussian_kde,
-    go,
-    json,
-    np,
-    pd,
-    px,
-    st,
-    ttest_ind,
-)
+from .common import chi2_contingency, pd, st, ttest_ind
 from html import escape
 
-def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
-        # HYPOTHESIS TEST: FREIGHT COST vs DELIVERY DELAY
-        # ============================================================
 
+def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         st.subheader("📊 Does Freight Cost Affect Delivery Delay?")
 
         st.markdown(
@@ -27,9 +15,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
             """
         )
 
-        # ------------------------------------------------------------
-        # Prepare data
-        # ------------------------------------------------------------
 
         test_data = filtered[
             ["freight cost (usd)", "delivery_delay_days"]
@@ -48,9 +33,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         test_data = test_data.dropna()
 
 
-        # ------------------------------------------------------------
-        # Categorize freight cost
-        # ------------------------------------------------------------
 
         test_data["freight_category"] = pd.qcut(
             test_data["freight cost (usd)"],
@@ -65,9 +47,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         )
 
 
-        # ------------------------------------------------------------
-        # Categorize delivery delay
-        # ------------------------------------------------------------
 
         test_data["delay_category"] = pd.cut(
             test_data["delivery_delay_days"],
@@ -87,9 +66,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         )
 
 
-        # ------------------------------------------------------------
-        # Contingency table
-        # ------------------------------------------------------------
 
         contingency_table = pd.crosstab(
             test_data["freight_category"],
@@ -97,9 +73,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         )
 
 
-        # ------------------------------------------------------------
-        # Chi-square test
-        # ------------------------------------------------------------
 
         if (
             contingency_table.shape[0] >= 2
@@ -127,9 +100,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                 conclusion_type = "info"
 
 
-            # ========================================================
-            # RESULTS
-            # ========================================================
 
             r1, r2, r3, r4 = st.columns(4)
 
@@ -160,9 +130,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                 st.success(conclusion)
 
 
-            # ========================================================
-            # CONTINGENCY TABLE + HEATMAP
-            # ========================================================
 
             st.markdown("#### Freight Cost vs Delivery Delay")
 
@@ -172,9 +139,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
             )
 
 
-            # ========================================================
-            # INTERPRETATION
-            # ========================================================
 
             st.markdown("#### Interpretation")
 
@@ -206,9 +170,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                 )
 
 
-            # ========================================================
-            # EXPECTED FREQUENCIES CHECK
-            # ========================================================
 
             expected_df = pd.DataFrame(
                 expected,
@@ -246,7 +207,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
         st.subheader("📊 Delivery Delay: Before 2010 vs 2010–2014")
 
-        # Prepare data
         before = filtered.loc[
             filtered["delivery_year"] < 2010,
             "delivery_delay_days"
@@ -257,14 +217,12 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
             "delivery_delay_days"
         ].dropna()
 
-        # Welch's independent t-test
         t_stat, p = ttest_ind(
             before,
             period,
             equal_var=False
         )
 
-        # Calculate means
         before_mean = before.mean()
         period_mean = period.mean()
 
@@ -278,7 +236,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
             "between the two periods."
         )
 
-        # Metrics
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
@@ -305,7 +262,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                 f"{p:.6f}"
             )
 
-        # Verdict
         if p < 0.05:
             st.error(
                 "Reject H₀: There is a statistically significant difference "

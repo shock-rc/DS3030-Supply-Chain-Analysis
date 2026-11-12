@@ -1,22 +1,9 @@
-from .common import (
-    go,
-    np,
-    pd,
-    px,
-    st,
-    StandardScaler,
-    KMeans,
-    PCA,
-)
+from .common import KMeans, PCA, StandardScaler, go, np, pd, px, st
 
 from kmodes.kprototypes import KPrototypes
 
 
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
-
-    # ============================================================
-    # FEATURES
-    # ============================================================
 
     numeric_features = [
         "line item quantity",
@@ -70,9 +57,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         st.warning("Select at least one categorical feature.")
         return
 
-    # ============================================================
-    # PREPARE DATA
-    # ============================================================
 
     d = filtered.copy()
 
@@ -115,9 +99,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     scaler = StandardScaler()
     Xs = scaler.fit_transform(numeric_data)
 
-    # ============================================================
-    # CLUSTERING
-    # ============================================================
 
     K = st.slider(
         "Number of clusters (k)",
@@ -173,9 +154,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
     d["cluster"] = labels
 
-    # ============================================================
-    # CLUSTER SIZES
-    # ============================================================
 
     size = (
         d["cluster"]
@@ -214,9 +192,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         use_container_width=True,
     )
 
-    # ============================================================
-    # PCA VISUALIZATION
-    # ============================================================
 
     st.subheader(f"{algorithm} Clusters in PCA Space")
 
@@ -370,9 +345,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         "categorical features."
     )
 
-    # ============================================================
-    # STANDARDIZED CLUSTER PROFILE
-    # ============================================================
 
     st.subheader("Standardized Cluster Profile")
 
@@ -411,9 +383,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         use_container_width=True,
     )
 
-    # ============================================================
-    # BOXPLOT
-    # ============================================================
 
     st.subheader("Key Variables by Cluster")
 
@@ -463,9 +432,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         use_container_width=True,
     )
 
-    # ============================================================
-    # CATEGORICAL COMPOSITION
-    # ============================================================
 
     st.subheader("Categorical Composition by Cluster")
 
@@ -516,9 +482,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         use_container_width=True,
     )
 
-    # ============================================================
-    # COUNTRY COMPOSITION
-    # ============================================================
 
     st.subheader("Country Composition")
 
@@ -571,9 +534,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         use_container_width=True,
     )
 
-    # ============================================================
-    # YEAR COMPOSITION
-    # ============================================================
 
     if "delivery_year" in d.columns:
 
@@ -620,9 +580,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
             use_container_width=True,
         )
 
-    # ============================================================
-    # LATE DELIVERY RATE
-    # ============================================================
 
     d["late"] = (
         d["delivery_delay_days"] > 0

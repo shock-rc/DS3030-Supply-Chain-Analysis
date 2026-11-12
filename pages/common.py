@@ -1,4 +1,4 @@
-"""Shared imports and helpers for dashboard pages."""
+"""Shared third-party imports for dashboard pages."""
 
 import json
 
@@ -7,9 +7,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from scipy.stats import chi2_contingency, gaussian_kde, ttest_ind
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
-
+from sklearn.preprocessing import StandardScaler
 import streamlit as st

@@ -1,5 +1,7 @@
 """Data loading and reusable dashboard analysis helpers."""
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -8,8 +10,10 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
-
-DATA_FILE = "Supply_Chain_Shipment_Data_Cleaned.csv"
+DATA_DIR = Path(__file__).resolve().parent / "data"
+RAW_DATA_FILE = DATA_DIR / "Supply_Chain_Shipment_Data.csv"
+DATA_FILE = DATA_DIR / "Supply_Chain_Shipment_Data_Cleaned.csv"
+MANUFACTURING_SITE_FILE = DATA_DIR / "manufacturing_site.json"
 
 
 @st.cache_data

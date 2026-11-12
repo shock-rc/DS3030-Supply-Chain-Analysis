@@ -1,19 +1,11 @@
-from .common import (
-    chi2_contingency,
-    gaussian_kde,
-    go,
-    json,
-    np,
-    pd,
-    px,
-    st,
-    ttest_ind,
-)
+from .common import pd, px, st
+from data import RAW_DATA_FILE
+
 
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     st.subheader("Data Cleaning & Summary of Data")
 
-    raw = pd.read_csv("Supply_Chain_Shipment_Data.csv")
+    raw = pd.read_csv(RAW_DATA_FILE)
     numeric_cleaned = df
 
     before_missing = int(raw.isna().sum().sum())
@@ -55,8 +47,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         ],
     })
     st.dataframe(challenges, use_container_width=True, hide_index=True)
-
-
     missing = (
         numeric_cleaned.isna().sum().sort_values(ascending=False)
         .reset_index()

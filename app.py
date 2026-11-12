@@ -1,6 +1,6 @@
 import streamlit as st
 
-from data import DATA_FILE, load_data
+from data import load_data
 from pages.association_rules import render as render_association_rules
 from pages.clustering import render as render_clustering
 from pages.data_processing import render as render_data_processing

@@ -1,26 +1,14 @@
-from .common import (
-    chi2_contingency,
-    gaussian_kde,
-    go,
-    json,
-    np,
-    pd,
-    px,
-    st,
-    ttest_ind,
-)
+from .common import pd, px, st
 from data import association_rules
+
 
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     st.subheader("Association Rules: What tends to occur together?")
 
-    # Select only numeric columns
     numeric_data = filtered.select_dtypes(include="number").drop(columns = "id", errors="ignore")
 
-    # Calculate correlation matrix
     corr_matrix = numeric_data.corr()
 
-    # Plot
     fig = px.imshow(
         corr_matrix,
         text_auto=".2f",

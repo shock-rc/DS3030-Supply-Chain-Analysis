@@ -1,18 +1,15 @@
 from .common import (
-    chi2_contingency,
-    gaussian_kde,
+    KMeans,
+    PCA,
+    StandardScaler,
     go,
-    json,
     np,
     pd,
     px,
+    silhouette_score,
     st,
-    ttest_ind,
-    StandardScaler,
-    PCA,
-    KMeans,
-    silhouette_score
 )
+
 
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     pca_features = [
@@ -27,19 +24,13 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         "delivery_delay_days"
     ]
 
-    # Create an expander matching your image's title style
     with st.expander("Features used for PCA", expanded=True):
-        # st.multiselect naturally acts as interactive tags with 'x' remove buttons
         pos_cols = st.multiselect(
             label="Features",
             options=pca_features,
-            default=pca_features,  # All selected by default like the image
-            label_visibility="collapsed" # Hides the redundant label to look clean like a tag container
+            default=pca_features,
+            label_visibility="collapsed",
         )
-
-    # ============================================================
-    # FEATURE SELECTION
-    # ============================================================
 
     d = filtered.copy()
 
@@ -70,16 +61,8 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     # Remove zero-variance columns
     X = X.loc[:, X.std() > 1e-8]
 
-    # ============================================================
-    # STANDARDIZATION
-    # ============================================================
-
     scaler = StandardScaler()
     Xs = scaler.fit_transform(X)
-
-    # ------------------------------------------------------------
-    # Explained variance
-    # ------------------------------------------------------------
 
     pca_full = PCA().fit(Xs)
 
@@ -88,7 +71,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
     components = list(range(1, len(evr) + 1))
 
-    # Plot explained variance
     fig_ev = go.Figure()
 
     fig_ev.add_trace(
@@ -136,9 +118,7 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     )
 
 
-    # ------------------------------------------------------------
     # PCA with 3 components
-    # ------------------------------------------------------------
 
     pca = PCA(n_components=3).fit(Xs)
 
@@ -147,9 +127,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     v = pca.explained_variance_ratio_ * 100
 
 
-    # ============================================================
-    # PCA LOADINGS
-    # ============================================================
 
     st.markdown("### PCA Component Loadings")
 
@@ -165,15 +142,10 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     )
 
 
-    # ============================================================
-    # CLUSTERING
-    # ============================================================
 
     st.subheader("K-Means Clustering")
 
-    # ------------------------------------------------------------
     # Evaluate k = 2 to 10
-    # ------------------------------------------------------------
 
     ks = range(2, 11)
 
@@ -206,16 +178,11 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     )
 
 
-    # ============================================================
-    # ELBOW + SILHOUETTE PLOTS
-    # ============================================================
 
     col1, col2 = st.columns(2)
 
 
-    # ------------------------------------------------------------
     # Elbow curve
-    # ------------------------------------------------------------
 
     fig_elbow = go.Figure()
 
@@ -242,9 +209,7 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         )
 
 
-    # ------------------------------------------------------------
     # Silhouette score
-    # ------------------------------------------------------------
 
     fig_sil = go.Figure()
 
@@ -279,9 +244,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         )
 
 
-    # ============================================================
-    # FINAL K-MEANS MODEL
-    # ============================================================
 
     km = KMeans(
         n_clusters=best_k,
@@ -295,9 +257,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     cent = pca.transform(km.cluster_centers_)
 
 
-    # ============================================================
-    # CLUSTERS IN PCA SPACE
-    # ============================================================
 
     st.markdown("### K-Means Clusters in PCA Space")
 
@@ -366,9 +325,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     )
 
 
-    # ============================================================
-    # CLUSTER SIZE
-    # ============================================================
 
     cluster_sizes = (
         pd.Series(labels)
@@ -406,9 +362,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     )
 
 
-    # ============================================================
-    # CLUSTER PROFILE
-    # ============================================================
 
     st.markdown("### Cluster Profile — Median Values")
 
@@ -429,9 +382,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     )
 
 
-    # ============================================================
-    # OPTIONAL: CLUSTER PROFILE HEATMAP
-    # ============================================================
 
     # Calculate standardized feature means per cluster
     profile_z = (

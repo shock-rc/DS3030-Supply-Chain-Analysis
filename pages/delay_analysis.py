@@ -1,14 +1,5 @@
-from .common import (
-    chi2_contingency,
-    gaussian_kde,
-    go,
-    json,
-    np,
-    pd,
-    px,
-    st,
-    ttest_ind,
-)
+from .common import gaussian_kde, go, np, pd, px, st
+
 
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     st.subheader("Delivery Delay Analysis")
@@ -16,9 +7,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         "Analysis of delivery performance using scheduled and actual client delivery dates."
     )
 
-    # ---------------------------------------------------------
-    # Basic delay statistics
-    # ---------------------------------------------------------
 
     delay_data = filtered.copy()
 
@@ -44,9 +32,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
     max_delay = delay_data["delivery_delay_days"].max()
 
-    # ---------------------------------------------------------
-    # KPI cards
-    # ---------------------------------------------------------
 
     k1, k2, k3, k4, k5 = st.columns(5)
 
@@ -80,9 +65,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
     st.divider()
 
-    # ---------------------------------------------------------
-    # Delivery status distribution + delay distribution
-    # ---------------------------------------------------------
 
     a, b = st.columns(2)
 
@@ -141,9 +123,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
             use_container_width=True
         )
 
-    # ---------------------------------------------------------
-    # Delay by shipment mode
-    # ---------------------------------------------------------
 
     st.markdown("### Delivery Delay Distribution by Shipment Mode")
 
@@ -225,9 +204,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         use_container_width=True
     )
 
-    # ---------------------------------------------------------
-    # Delay by destination country
-    # ---------------------------------------------------------
 
     st.markdown("### Destination-Level Delay Analysis")
 
@@ -313,9 +289,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
             use_container_width=True
         )
 
-    # ---------------------------------------------------------
-    # Delay trend over time
-    # ---------------------------------------------------------
 
     st.markdown("### Delivery Delay Trend")
 
@@ -381,9 +354,6 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     """)
 
 
-    # ---------------------------------------------------------
-    # Most delayed shipments
-    # ---------------------------------------------------------
 
     st.markdown("### Most Delayed Shipments")
 

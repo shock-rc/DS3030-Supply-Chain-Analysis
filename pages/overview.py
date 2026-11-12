@@ -1,14 +1,6 @@
-from .common import (
-    chi2_contingency,
-    gaussian_kde,
-    go,
-    json,
-    np,
-    pd,
-    px,
-    st,
-    ttest_ind,
-)
+from .common import pd, px, st
+from data import RAW_DATA_FILE
+
 
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     st.markdown("### Executive Overview")
@@ -17,9 +9,9 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     total_shipments = len(filtered)
     total_value = filtered["line item value"].sum()
     freight = filtered["freight cost (usd)"].sum()
-    avg_distance_note = "Distance requires a geographic lookup; see Insights."
     late_pct = (filtered["delivery_status"].eq("Late").mean() * 100) if total_shipments else 0
-    data_completeness = 100 * filtered[pd.read_csv("Supply_Chain_Shipment_Data.csv").columns].notna().mean().mean()
+    raw_columns = pd.read_csv(RAW_DATA_FILE, nrows=0).columns
+    data_completeness = 100 * filtered[raw_columns].notna().mean().mean()
 
     c1.metric("Shipments", f"{total_shipments:,}")
     c2.metric("Line-item value", f"${total_value:,.0f}")
