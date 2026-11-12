@@ -464,3 +464,14 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         fig_heatmap,
         use_container_width=True
     )
+
+    st.markdown("### Cluster Analysis")
+
+    st.markdown("""
+    - **Cluster 0:** Small, lightweight shipments with low freight costs but high freight cost per kg.
+    - **Cluster 1:** Larger, higher-value shipments with relatively efficient transportation costs.
+    - **Cluster 2:** Low-value shipments where freight is disproportionately expensive relative to shipment value.
+    - **Cluster 3:** Shipments with **exceptionally high delivery delays**, despite only moderately higher freight costs.
+
+    **Overall:** The clusters reveal distinct supply-chain patterns, with **delivery delays being the defining characteristic of Cluster 3**.
+    """)

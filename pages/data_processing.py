@@ -33,7 +33,7 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         st.markdown(
             """
             <div style="background-color: #ffe6e6; border-left: 4px solid #ff4b4b; padding: 6px 10px; color: #cc0000; font-size: 0.8em; border-radius: 4px; margin-top: 5px;">
-                <strong>Note:</strong> Only NaN and NaT counts are shown here using df.isna()
+                <strong>Note:</strong> Only NaN and NaT counts are shown here using df.isna().sum()
             </div>
             """,
             unsafe_allow_html=True

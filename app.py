@@ -95,7 +95,8 @@ def main():
         "Association Rules": render_association_rules,
         "Insights & Hypothesis Testing": render_insights,
     }
-    renderers[select_page()](filtered, data)
+    selected_page = select_page()
+    renderers.get(selected_page, render_overview)(filtered, data)
 
 
 if __name__ == "__main__":

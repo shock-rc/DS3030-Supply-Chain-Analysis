@@ -9,6 +9,7 @@ from .common import (
     st,
     ttest_ind,
 )
+from html import escape
 
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         # HYPOTHESIS TEST: FREIGHT COST vs DELIVERY DELAY
@@ -336,51 +337,134 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
         st.divider()
 
-        st.markdown(
-            """
-            ### 1. Look beyond total freight cost
-            A country can have a high total freight bill simply because it receives many
-            shipments. **Freight per kg** and **freight per unit** help distinguish volume
-            effects from logistics efficiency.
-
-            ### 2. Treat missingness as information
-            Missing shipment mode, insurance, and process dates should not automatically
-            be replaced with zero. The dashboard keeps them explicit so that the analysis
-            does not silently invent operational facts.
-
-            ### 3. Use PCA to explain clustering
-            PCA is not being used just as a visual decoration. Its loadings identify the
-            combinations of cost, value, quantity and weight that dominate the data before
-            K-Means groups shipments.
-
-            ### 4. Investigate high-cost outliers
-            Shipments with unusually high freight-per-unit or freight-per-kg are candidates
-            for deeper operational review. They are **flags**, not proof of inefficiency.
-
-            ### 5. Association rules describe recurring operating patterns
-            High-lift rules can reveal combinations of product group, shipment mode,
-            fulfilment method and Incoterm that repeatedly appear together.
-            """
+        st.subheader("Final Dashboard Summary")
+        st.caption(
+            "A filtered, presentation-ready summary of delivery performance, cost "
+            "efficiency, and the supporting analyses."
         )
 
-        st.markdown("#### Automatically generated watchlist")
-        watch = filtered.dropna(subset=["freight_per_unit"]).copy()
-        if len(watch):
+        summary_data = filtered.copy()
+        summary_data["delivery_delay_days"] = pd.to_numeric(
+            summary_data["delivery_delay_days"], errors="coerce"
+        )
+        summary_data["freight_per_unit"] = pd.to_numeric(
+            summary_data["freight_per_unit"], errors="coerce"
+        )
+        summary_data["freight_per_kg"] = pd.to_numeric(
+            summary_data["freight_per_kg"], errors="coerce"
+        )
+
+        total_shipments = len(summary_data)
+        late_shipments = summary_data["delivery_status"].eq("Late").sum()
+        late_pct = 100 * late_shipments / total_shipments if total_shipments else 0
+        median_delay = summary_data["delivery_delay_days"].median()
+        median_freight_unit = summary_data["freight_per_unit"].median()
+
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("Shipments analysed", f"{total_shipments:,}")
+        s2.metric("Late deliveries", f"{late_pct:.1f}%")
+        s3.metric(
+            "Median delay",
+            f"{median_delay:.1f} days" if pd.notna(median_delay) else "N/A",
+        )
+        s4.metric(
+            "Median freight / unit",
+            f"${median_freight_unit:,.2f}"
+            if pd.notna(median_freight_unit)
+            else "N/A",
+        )
+
+        late_data = summary_data[summary_data["delivery_status"].eq("Late")]
+        mode = (
+            late_data["shipment mode"].dropna().value_counts().idxmax()
+            if not late_data.empty and late_data["shipment mode"].notna().any()
+            else "not available"
+        )
+        country = (
+            late_data["country"].dropna().value_counts().idxmax()
+            if not late_data.empty and late_data["country"].notna().any()
+            else "not available"
+        )
+
+        findings = pd.DataFrame(
+            {
+                "Area": [
+                    "Delivery performance",
+                    "Hypothesis testing",
+                    "Segmentation and patterns",
+                ],
+                "Summary": [
+                    f"Most common late-shipment mode: {mode}.\n"
+                    f"Most represented destination: {country}.",
+                    "Chi-square: freight cost and delay are statistically "
+                    "dependent.\n"
+                    "Welch's t-test: delivery delays increased during "
+                    "2010–2014 compared with the period before 2010.",
+                    "PCA and K-Means were attempted.\n"
+                    "The low silhouette score means no definitive clusters could be made out of the data.\n"
+                    "No clear patterns could be established.",
+                ],
+            }
+        )
+        findings_rows = "".join(
+            f"<tr><td>{escape(row['Area'])}</td>"
+            f"<td>{escape(row['Summary'])}</td></tr>"
+            for _, row in findings.iterrows()
+        )
+        st.markdown(
+            f"""
+            <div style="width: 100%; overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="width: 24%; text-align: left;">Area</th>
+                            <th style="text-align: left;">Summary</th>
+                        </tr>
+                    </thead>
+                    <tbody>{findings_rows}</tbody>
+                </table>
+            </div>
+            <style>
+                th, td {{
+                    padding: 0.65rem 0.75rem;
+                    border-bottom: 1px solid rgba(128, 128, 128, 0.35);
+                    vertical-align: top;
+                    white-space: pre-line;
+                    overflow-wrap: anywhere;
+                }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        watch = summary_data.dropna(subset=["freight_per_unit"]).copy()
+        st.markdown("#### Priority review list")
+        if watch.empty:
+            st.info("No freight-per-unit values are available for the current filters.")
+        else:
             threshold = watch["freight_per_unit"].quantile(0.95)
             watch = watch[watch["freight_per_unit"] >= threshold]
             cols = [
                 "id", "country", "product group", "shipment mode",
                 "line item quantity", "freight cost (usd)",
-                "freight_per_unit", "vendor"
+                "freight_per_unit", "delivery_status", "vendor",
             ]
-            st.write(
-                f"Showing the top 5% by freight per unit "
-                f"(threshold ≈ ${threshold:,.2f}/unit)."
+            display = watch.sort_values("freight_per_unit", ascending=False)[cols].head(25)
+            st.caption(
+                f"Top 5% of freight per unit (review threshold: "
+                f"${threshold:,.2f}/unit). These are flags for investigation, "
+                "not conclusions about performance."
             )
             st.dataframe(
-                watch.sort_values("freight_per_unit", ascending=False)[cols].head(25),
+                display.style.format(
+                    {
+                        "line item quantity": "{:,.0f}",
+                        "freight cost (usd)": "${:,.2f}",
+                        "freight_per_unit": "${:,.2f}",
+                    }
+                ),
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
             )
 
         st.divider()

@@ -1,25 +1,24 @@
 from .common import (
-    chi2_contingency,
-    gaussian_kde,
     go,
-    json,
     np,
     pd,
     px,
     st,
-    ttest_ind,
     StandardScaler,
-    PCA,
     KMeans,
-    silhouette_score
+    PCA,
 )
 
+from kmodes.kprototypes import KPrototypes
+
+
 def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
-    # CLUSTERING ANALYSIS
-    # Uses `filtered` as the input dataframe
+
     # ============================================================
-    # List of the 9 original feature columns used for PCA
-    pca_features = [
+    # FEATURES
+    # ============================================================
+
+    numeric_features = [
         "line item quantity",
         "line item value",
         "unit price",
@@ -28,124 +27,158 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         "line item insurance (usd)",
         "freight_per_kg",
         "freight_pct_of_value",
-        "delivery_delay_days"
+        "delivery_delay_days",
     ]
 
-    # Create an expander matching your image's title style
-    with st.expander("Features used for Clustering", expanded=True):
-        # st.multiselect naturally acts as interactive tags with 'x' remove buttons
-        pos_cols = st.multiselect(
-            label="Features",
-            options=pca_features,
-            default=pca_features,  # All selected by default like the image
-            label_visibility="collapsed" # Hides the redundant label to look clean like a tag container
+    categorical_features = [
+        "country",
+        "shipment mode",
+        "product group",
+        "vendor",
+        "vendor inco term",
+        "fulfill via",
+        "delivery_status",
+    ]
+
+    with st.expander("Clustering Features", expanded=True):
+
+        algorithm = st.radio(
+            "Clustering algorithm",
+            ["K-Means", "K-Prototypes"],
+            horizontal=True,
         )
 
+        num_cols = st.multiselect(
+            "Numeric features",
+            numeric_features,
+            default=numeric_features,
+        )
+
+        cat_cols = st.multiselect(
+            "Categorical features",
+            categorical_features,
+            default=[
+                "shipment mode",
+                "product group",
+                "delivery_status",
+            ],
+            disabled=(algorithm == "K-Means"),
+        )
+
+    if not num_cols:
+        st.warning("Select at least one numeric feature.")
+        return
+
+    if algorithm == "K-Prototypes" and not cat_cols:
+        st.warning("Select at least one categorical feature.")
+        return
+
     # ============================================================
-    # 1. PREPARE DATA
+    # PREPARE DATA
     # ============================================================
 
     d = filtered.copy()
 
-    # Keep valid observations
     d = d[
         (d["weight (kilograms)"] > 0) &
         (d["line item value"] > 0)
     ].copy()
 
+    if d.empty:
+        st.warning("No valid observations are available.")
+        return
 
-    # ------------------------------------------------------------
-    # Filler-value detection
-    # ------------------------------------------------------------
+    # Log-transform numeric variables
+    numeric_data = pd.DataFrame(index=d.index)
 
-    w_mode = d["weight (kilograms)"].mode()[0]
-    f_mode = d["freight cost (usd)"].mode()[0]
+    for col in num_cols:
+        values = pd.to_numeric(d[col], errors="coerce")
 
-    d["weight_is_filler"] = (
-        d["weight (kilograms)"] == w_mode
+        numeric_data[col] = (
+            np.sign(values) * np.log1p(values.abs())
+        )
+
+    numeric_data = (
+        numeric_data
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(numeric_data.median())
     )
 
-    d["freight_is_filler"] = (
-        d["freight cost (usd)"] == f_mode
-    )
+    # Remove constant features
+    numeric_data = numeric_data.loc[
+        :,
+        numeric_data.std() > 1e-8
+    ]
 
-    # ============================================================
-    # FEATURE ENGINEERING
-    # ============================================================
+    if numeric_data.empty:
+        st.warning("No usable numeric features remain.")
+        return
 
-    X = pd.DataFrame(index=d.index)
-
-    for c in pos_cols:
-        X["log_" + c] = np.log1p(d[c])
-
-    # Signed log because delivery delay can be negative
-    X["signed_log_delay"] = (
-        np.sign(d["delivery_delay_days"]) *
-        np.log1p(d["delivery_delay_days"].abs())
-    )
-
-    # Clean invalid values
-    X = X.replace(
-        [np.inf, -np.inf],
-        np.nan
-    )
-
-    # Median imputation
-    X = X.fillna(X.median())
-
-    # Remove zero-variance columns
-    X = X.loc[:, X.std() > 1e-8]
-
-
-    # ============================================================
-    # STANDARDIZATION
-    # ============================================================
-
+    # Standardize numeric features
     scaler = StandardScaler()
-
-    Xs = scaler.fit_transform(X)
-
+    Xs = scaler.fit_transform(numeric_data)
 
     # ============================================================
-    # PCA FOR VISUALIZATION
+    # CLUSTERING
     # ============================================================
 
-    pca = PCA(n_components=2)
-
-    P = pca.fit_transform(Xs)
-
-    v = pca.explained_variance_ratio_ * 100
-
-
-    # ============================================================
-    # K-MEANS CLUSTERING
-    # ============================================================
-
-    # Use k = 3 as in your original analysis
     K = st.slider(
-    "Number of Clusters (k)",
-    min_value=1,
-    max_value=10,
-    value=10,
-    step=1
+        "Number of clusters (k)",
+        min_value=2,
+        max_value=10,
+        value=4,
+        step=1,
     )
 
-    km = KMeans(
-        n_clusters=K,
-        n_init=10,
-        random_state=42
-    )
+    if algorithm == "K-Means":
 
-    d["cluster"] = km.fit_predict(Xs)
+        model = KMeans(
+            n_clusters=K,
+            n_init=10,
+            random_state=42,
+        )
 
-    labels = d["cluster"].values
+        labels = model.fit_predict(Xs)
 
+    else:
+
+        categorical_data = (
+            d[cat_cols]
+            .fillna("Unknown")
+            .astype(str)
+        )
+
+        model_input = np.column_stack([
+            Xs,
+            categorical_data.to_numpy(),
+        ])
+
+        categorical_indices = list(
+            range(
+                Xs.shape[1],
+                Xs.shape[1] + len(cat_cols),
+            )
+        )
+
+        model = KPrototypes(
+            n_clusters=K,
+            init="Cao",
+            n_init=5,
+            max_iter=100,
+            gamma=None,
+            random_state=42,
+        )
+
+        labels = model.fit_predict(
+            model_input,
+            categorical=categorical_indices,
+        )
+
+    d["cluster"] = labels
 
     # ============================================================
     # CLUSTER SIZES
     # ============================================================
-
-    cl = sorted(d["cluster"].unique())
 
     size = (
         d["cluster"]
@@ -154,18 +187,21 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
     )
 
     cluster_size_df = pd.DataFrame({
-        "Cluster": [f"Cluster {c}" for c in size.index],
+        "Cluster": [
+            f"Cluster {c}" for c in size.index
+        ],
         "Observations": size.values,
-        "Percentage": (size.values / len(d) * 100).round(1)
+        "Percentage": (
+            size.values / len(d) * 100
+        ).round(1),
     })
-
 
     fig_size = px.bar(
         cluster_size_df,
         x="Cluster",
         y="Observations",
         text="Observations",
-        title="Number of Shipment Line Items per Cluster"
+        title=f"{algorithm}: Cluster Sizes",
     )
 
     fig_size.update_traces(
@@ -178,37 +214,55 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
     st.plotly_chart(
         fig_size,
-        use_container_width=True
+        use_container_width=True,
     )
 
-
     # ============================================================
-    # 2. PCA CLUSTER VISUALIZATION
+    # PCA VISUALIZATION
     # ============================================================
 
-    st.subheader("K-Means Clusters in PCA Space")
+    st.subheader(f"{algorithm} Clusters in PCA Space")
 
-    # Spatial aggregation ONLY for visualization
-    # Clustering itself was performed on every observation.
+    if Xs.shape[1] >= 2:
+
+        pca = PCA(n_components=2)
+        P = pca.fit_transform(Xs)
+        variance = (
+            pca.explained_variance_ratio_ * 100
+        )
+
+    else:
+
+        P = np.column_stack([
+            Xs[:, 0],
+            np.zeros(len(d)),
+        ])
+
+        variance = np.array([
+            100.0,
+            0.0,
+        ])
+
+    # Aggregate points for visualization
     nb = 45
 
     bx = pd.cut(
         P[:, 0],
         nb,
-        labels=False
+        labels=False,
     )
 
     by = pd.cut(
         P[:, 1],
         nb,
-        labels=False
+        labels=False,
     )
 
     b = pd.DataFrame({
         "x": P[:, 0],
         "y": P[:, 1],
         "bin": bx * nb + by,
-        "cluster": d["cluster"].values
+        "cluster": labels,
     })
 
     agg = (
@@ -219,47 +273,40 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
             n=("x", "size"),
             cluster=(
                 "cluster",
-                lambda s: s.mode()[0]
+                lambda x: x.mode()[0],
             ),
             purity=(
                 "cluster",
-                lambda s:
-                s.value_counts(normalize=True).iloc[0]
-            )
+                lambda x:
+                x.value_counts(
+                    normalize=True
+                ).iloc[0],
+            ),
         )
         .reset_index(drop=True)
     )
 
-    # Centroids projected into PCA space
-    cent = pca.transform(
-        km.cluster_centers_
-    )
+    fig_pca = go.Figure()
 
-    # Plot aggregated points
-    fig_pca_cluster = go.Figure()
-
-    for c in cl:
+    for c in sorted(d["cluster"].unique()):
 
         a = agg[
             agg["cluster"] == c
         ]
 
-        fig_pca_cluster.add_trace(
+        fig_pca.add_trace(
             go.Scatter(
                 x=a["x"],
                 y=a["y"],
                 mode="markers",
-                name=f"Cluster {c} (n={size[c]:,})",
+                name=f"Cluster {c}",
                 marker=dict(
                     size=8,
                     opacity=0.8,
-                    line=dict(
-                        width=0.5
-                    )
                 ),
                 customdata=np.column_stack([
                     a["n"],
-                    a["purity"]
+                    a["purity"],
                 ]),
                 hovertemplate=(
                     "PC1: %{x:.3f}<br>"
@@ -267,68 +314,83 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
                     "Observations: %{customdata[0]:,.0f}<br>"
                     "Cluster purity: %{customdata[1]:.2%}"
                     "<extra></extra>"
-                )
+                ),
             )
         )
 
-    # Centroids
-    fig_pca_cluster.add_trace(
+    # Numeric cluster centers for PCA visualization
+    numeric_centers = np.vstack([
+        Xs[labels == c].mean(axis=0)
+        for c in sorted(d["cluster"].unique())
+    ])
+
+    center_pca = (
+        pca.transform(numeric_centers)
+        if Xs.shape[1] >= 2
+        else numeric_centers[:, :1]
+    )
+
+    if Xs.shape[1] < 2:
+        center_pca = np.column_stack([
+            center_pca[:, 0],
+            np.zeros(len(center_pca)),
+        ])
+
+    fig_pca.add_trace(
         go.Scatter(
-            x=cent[:, 0],
-            y=cent[:, 1],
+            x=center_pca[:, 0],
+            y=center_pca[:, 1],
             mode="markers",
-            name="Centroids",
+            name="Cluster Centers",
             marker=dict(
                 symbol="x",
-                size=18,
+                size=16,
                 color="black",
-                line=dict(
-                    width=2
-                )
-            )
+            ),
         )
     )
 
-    fig_pca_cluster.update_layout(
-        title=(
-            f"K-Means (k={K}) in PCA Space"
+    fig_pca.update_layout(
+        title=f"{algorithm} (k={K}) in PCA Space",
+        xaxis_title=(
+            f"PC1 ({variance[0]:.1f}% variance)"
         ),
-        xaxis_title=f"PC1 ({v[0]:.1f}% variance)",
-        yaxis_title=f"PC2 ({v[1]:.1f}% variance)",
+        yaxis_title=(
+            f"PC2 ({variance[1]:.1f}% variance)"
+        ),
         height=700,
-        hovermode="closest"
+        hovermode="closest",
     )
 
     st.plotly_chart(
-        fig_pca_cluster,
-        use_container_width=True
+        fig_pca,
+        use_container_width=True,
     )
 
     st.caption(
-        "Each plotted point represents a spatial grid bin. "
-        "Point size indicates the number of shipment observations "
-        "in that bin. Clustering was performed using all observations."
+        "PCA is used only for visualization. "
+        "K-Prototypes clustering uses both numerical and "
+        "categorical features."
     )
 
-
     # ============================================================
-    # 3. STANDARDIZED CLUSTER PROFILE HEATMAP
+    # STANDARDIZED CLUSTER PROFILE
     # ============================================================
 
     st.subheader("Standardized Cluster Profile")
 
-    z = (
+    profile = (
         pd.DataFrame(
             Xs,
-            columns=X.columns,
-            index=d.index
+            columns=numeric_data.columns,
+            index=d.index,
         )
         .groupby(d["cluster"])
         .mean()
     )
 
     fig_heatmap = px.imshow(
-        z,
+        profile,
         text_auto=".2f",
         aspect="auto",
         color_continuous_scale="RdBu_r",
@@ -338,23 +400,22 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         labels={
             "x": "Feature",
             "y": "Cluster",
-            "color": "Mean z-score"
+            "color": "Mean z-score",
         },
-        title="Cluster Profile (Standardized, Log-Scale Features)"
+        title="Cluster Profile",
     )
 
     fig_heatmap.update_layout(
-        height=500
+        height=500,
     )
 
     st.plotly_chart(
         fig_heatmap,
-        use_container_width=True
+        use_container_width=True,
     )
 
-
     # ============================================================
-    # 4. BOXPLOTS OF KEY VARIABLES
+    # BOXPLOT
     # ============================================================
 
     st.subheader("Key Variables by Cluster")
@@ -365,21 +426,23 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         "freight cost (usd)",
         "freight_pct_of_value",
         "freight_per_kg",
-        "line item quantity"
+        "line item quantity",
     ]
 
     selected_box_col = st.selectbox(
         "Select variable",
-        key
+        key,
     )
 
-    # Clip only for plotting, same idea as original code
     box_data = d[
         ["cluster", selected_box_col]
     ].copy()
 
     box_data[selected_box_col] = (
-        box_data[selected_box_col]
+        pd.to_numeric(
+            box_data[selected_box_col],
+            errors="coerce",
+        )
         .clip(lower=1e-2)
     )
 
@@ -390,60 +453,47 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         color="cluster",
         points=False,
         log_y=True,
-        title=f"{selected_box_col} by Cluster"
+        title=f"{selected_box_col} by Cluster",
     )
 
     fig_box.update_layout(
-        xaxis_title="Cluster",
-        yaxis_title=selected_box_col,
         height=550,
-        showlegend=False
+        showlegend=False,
     )
 
     st.plotly_chart(
         fig_box,
-        use_container_width=True
+        use_container_width=True,
     )
-
-    st.caption(
-        "Logarithmic y-axis is used because these variables are strongly right-skewed. "
-        "Outliers are hidden only for visualization."
-    )
-
 
     # ============================================================
-    # 5. CATEGORICAL COMPOSITION
+    # CATEGORICAL COMPOSITION
     # ============================================================
 
     st.subheader("Categorical Composition by Cluster")
 
-    cat_plot_cols = [
-        "shipment mode",
-        "vendor inco term",
-        "first line designation",
-        "delivery_status"
+    available_cat_plots = [
+        col for col in categorical_features
+        if col in d.columns
     ]
 
     selected_cat = st.selectbox(
         "Select categorical variable",
-        cat_plot_cols
+        available_cat_plots,
     )
 
     cat_pct = (
         pd.crosstab(
             d["cluster"],
             d[selected_cat].astype(str),
-            normalize="index"
-        ) * 100
-    )
-
-    cat_pct = (
-        cat_pct
+            normalize="index",
+        )
+        .mul(100)
         .reset_index()
         .melt(
             id_vars="cluster",
             var_name=selected_cat,
-            value_name="percentage"
+            value_name="percentage",
         )
     )
 
@@ -455,60 +505,52 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         barmode="stack",
         title=f"{selected_cat} by Cluster",
         labels={
-            "cluster": "Cluster",
-            "percentage": "% of cluster"
-        }
+            "percentage": "% of Cluster",
+        },
     )
 
     fig_cat.update_layout(
         height=600,
-        yaxis=dict(
-            range=[0, 100],
-            title="% of Cluster"
-        )
+        yaxis=dict(range=[0, 100]),
     )
 
     st.plotly_chart(
         fig_cat,
-        use_container_width=True
+        use_container_width=True,
     )
 
-
     # ============================================================
-    # 6. COUNTRY COMPOSITION
+    # COUNTRY COMPOSITION
     # ============================================================
 
-    st.subheader("Country and Year Composition")
+    st.subheader("Country Composition")
 
-    # Top 8 countries
-    top_c = (
+    top_countries = (
         d["country"]
         .value_counts()
-        .index[:8]
+        .head(8)
+        .index
     )
 
     country_pct = (
         pd.crosstab(
             d["country"],
             d["cluster"],
-            normalize="index"
-        ) * 100
-    )
-
-    country_pct = (
-        country_pct
-        .loc[top_c]
+            normalize="index",
+        )
+        .mul(100)
+        .loc[top_countries]
         .reset_index()
         .melt(
             id_vars="country",
             var_name="cluster",
-            value_name="percentage"
+            value_name="percentage",
         )
     )
 
     country_pct["cluster"] = (
-        "Cluster " +
-        country_pct["cluster"].astype(str)
+        "Cluster "
+        + country_pct["cluster"].astype(str)
     )
 
     fig_country = px.bar(
@@ -517,148 +559,72 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         y="percentage",
         color="cluster",
         barmode="stack",
-        title="Top-8 Countries: % of Shipments per Cluster",
-        labels={
-            "percentage": "%"
-        }
+        title="Top 8 Countries: Cluster Composition",
+        labels={"percentage": "%"},
     )
 
     fig_country.update_layout(
         height=600,
-        yaxis=dict(
-            range=[0, 100]
-        ),
-        xaxis_tickangle=-40
+        yaxis=dict(range=[0, 100]),
+        xaxis_tickangle=-40,
     )
 
     st.plotly_chart(
         fig_country,
-        use_container_width=True
+        use_container_width=True,
     )
-
 
     # ============================================================
     # YEAR COMPOSITION
     # ============================================================
 
-    year_pct = (
-        pd.crosstab(
-            d["delivery_year"],
-            d["cluster"],
-            normalize="index"
-        ) * 100
-    )
+    if "delivery_year" in d.columns:
 
-    year_pct = (
-        year_pct
-        .reset_index()
-        .melt(
-            id_vars="delivery_year",
-            var_name="cluster",
-            value_name="percentage"
+        year_pct = (
+            pd.crosstab(
+                d["delivery_year"],
+                d["cluster"],
+                normalize="index",
+            )
+            .mul(100)
+            .reset_index()
+            .melt(
+                id_vars="delivery_year",
+                var_name="cluster",
+                value_name="percentage",
+            )
         )
-    )
 
-    year_pct["cluster"] = (
-        "Cluster " +
-        year_pct["cluster"].astype(str)
-    )
-
-    fig_year = px.bar(
-        year_pct,
-        x="delivery_year",
-        y="percentage",
-        color="cluster",
-        barmode="stack",
-        title="Delivery Year: % of Shipments per Cluster",
-        labels={
-            "delivery_year": "Delivery Year",
-            "percentage": "%"
-        }
-    )
-
-    fig_year.update_layout(
-        height=600,
-        yaxis=dict(
-            range=[0, 100]
+        year_pct["cluster"] = (
+            "Cluster "
+            + year_pct["cluster"].astype(str)
         )
-    )
 
-    st.plotly_chart(
-        fig_year,
-        use_container_width=True
-    )
+        fig_year = px.bar(
+            year_pct,
+            x="delivery_year",
+            y="percentage",
+            color="cluster",
+            barmode="stack",
+            title="Delivery Year: Cluster Composition",
+            labels={
+                "delivery_year": "Delivery Year",
+                "percentage": "%",
+            },
+        )
 
+        fig_year.update_layout(
+            height=600,
+            yaxis=dict(range=[0, 100]),
+        )
+
+        st.plotly_chart(
+            fig_year,
+            use_container_width=True,
+        )
 
     # ============================================================
-    # 7. VALUE VS WEIGHT
-    # ============================================================
-
-    value_weight = d[
-        [
-            "line item value",
-            "weight (kilograms)",
-            "cluster",
-            "country",
-            "product group",
-            "delivery_delay_days"
-        ]
-    ].copy()
-
-    # Remove invalid values for log-scale plot
-    value_weight = value_weight[
-        (value_weight["line item value"] > 0) &
-        (value_weight["weight (kilograms)"] > 0)
-    ]
-
-    value_weight["cluster"] = (
-        "Cluster " +
-        value_weight["cluster"].astype(str)
-    )
-
-    fig_value_weight = px.scatter(
-        value_weight,
-        x="line item value",
-        y="weight (kilograms)",
-        color="cluster",
-        hover_data=[
-            "country",
-            "product group",
-            "delivery_delay_days"
-        ],
-        log_x=True,
-        log_y=True,
-        opacity=0.25,
-        title="Value vs Weight by Cluster",
-        labels={
-            "line item value": "Line Item Value (USD)",
-            "weight (kilograms)": "Weight (kg)"
-        }
-    )
-
-    fig_value_weight.update_traces(
-        marker=dict(
-            size=6
-        )
-    )
-
-    fig_value_weight.update_layout(
-        height=650
-    )
-
-    st.plotly_chart(
-        fig_value_weight,
-        use_container_width=True
-    )
-
-    st.caption(
-        "Log scales are used for both axes because shipment value and weight "
-        "are strongly right-skewed."
-    )
-
-
-    # ============================================================
-    # 8. LATE DELIVERY RATE
+    # LATE DELIVERY RATE
     # ============================================================
 
     d["late"] = (
@@ -674,12 +640,12 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
 
     late_rate.columns = [
         "Cluster",
-        "Late Delivery Rate"
+        "Late Delivery Rate",
     ]
 
     late_rate["Cluster"] = (
-        "Cluster " +
-        late_rate["Cluster"].astype(str)
+        "Cluster "
+        + late_rate["Cluster"].astype(str)
     )
 
     fig_late = px.bar(
@@ -689,23 +655,21 @@ def render(filtered: pd.DataFrame, df: pd.DataFrame) -> None:
         text="Late Delivery Rate",
         title="Share of Late Deliveries by Cluster",
         labels={
-            "Late Delivery Rate": "Late Deliveries (%)"
-        }
+            "Late Delivery Rate": "Late Deliveries (%)",
+        },
     )
 
     fig_late.update_traces(
         texttemplate="%{text:.1f}%",
-        textposition="outside"
+        textposition="outside",
     )
 
     fig_late.update_layout(
         height=450,
-        yaxis=dict(
-            range=[0, 100]
-        )
+        yaxis=dict(range=[0, 100]),
     )
 
     st.plotly_chart(
         fig_late,
-        use_container_width=True
+        use_container_width=True,
     )
